@@ -1,0 +1,753 @@
+{
+  "id": "d5ae5015-91bd-4011-a3cf-49dcda6f37b6",
+  "revision": 0,
+  "last_node_id": 88,
+  "last_link_id": 98,
+  "nodes": [
+    {
+      "id": 72,
+      "type": "CLIPLoader",
+      "pos": [
+        -460.6978754136825,
+        34.655977901882636
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "CLIP\u540d\u79f0",
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u7c7b\u578b",
+          "name": "type",
+          "type": "COMBO",
+          "widget": {
+            "name": "type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u8bbe\u5907",
+          "name": "device",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "CLIP",
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            86
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "anima_text_encoder.safetensors",
+        "qwen_image",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "anima_text_encoder.safetensors",
+        "type": "qwen_image",
+        "device": "default"
+      }
+    },
+    {
+      "id": 73,
+      "type": "VAELoader",
+      "pos": [
+        -453.97495890577136,
+        234.59007111212455
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "vae\u540d\u79f0",
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VAE",
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            94
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "qwen_image_vae.safetensors"
+      }
+    },
+    {
+      "id": 74,
+      "type": "UNETLoader",
+      "pos": [
+        -464.6527553789674,
+        -143.7083577768365
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "UNet\u540d\u79f0",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u6570\u636e\u7c7b\u578b",
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "\u6a21\u578b",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            85
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "anima_turboV11.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "anima_turboV11.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 76,
+      "type": "LoraLoader",
+      "pos": [
+        -57.37429752996922,
+        -73.45518189766997
+      ],
+      "size": [
+        270,
+        126
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "\u6a21\u578b",
+          "name": "model",
+          "type": "MODEL",
+          "link": 85
+        },
+        {
+          "localized_name": "CLIP",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 86
+        },
+        {
+          "localized_name": "LoRA\u540d\u79f0",
+          "name": "lora_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "lora_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u6a21\u578b\u5f3a\u5ea6",
+          "name": "strength_model",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength_model"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "CLIP\u5f3a\u5ea6",
+          "name": "strength_clip",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength_clip"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "\u6a21\u578b",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            87
+          ]
+        },
+        {
+          "localized_name": "CLIP",
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            88,
+            89
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoader"
+      },
+      "widgets_values": [
+        "dksnpromax_v2.10_epoch29.safetensors",
+        1,
+        1
+      ],
+      "widgets_values_named": {
+        "lora_name": "dksnpromax_v2.10_epoch29.safetensors",
+        "strength_model": 1,
+        "strength_clip": 1
+      }
+    },
+    {
+      "id": 77,
+      "type": "KSampler",
+      "pos": [
+        933.3144567051797,
+        -214.4922748286959
+      ],
+      "size": [
+        270,
+        262
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "\u6a21\u578b",
+          "name": "model",
+          "type": "MODEL",
+          "link": 87
+        },
+        {
+          "localized_name": "\u6b63\u9762\u6761\u4ef6",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 91
+        },
+        {
+          "localized_name": "\u8d1f\u9762\u6761\u4ef6",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 90
+        },
+        {
+          "localized_name": "Latent\u56fe\u50cf",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 92
+        },
+        {
+          "localized_name": "\u79cd\u5b50",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u6b65\u6570",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "cfg",
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u91c7\u6837\u5668\u540d\u79f0",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u8c03\u5ea6\u5668",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u964d\u566a",
+          "name": "denoise",
+          "type": "FLOAT",
+          "widget": {
+            "name": "denoise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "Latent",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            93
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        664864458942773,
+        "randomize",
+        8,
+        1,
+        "er_sde",
+        "simple",
+        1
+      ],
+      "widgets_values_named": {
+        "seed": 664864458942773,
+        "control_after_generate": "randomize",
+        "steps": 8,
+        "cfg": 1,
+        "sampler_name": "er_sde",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    {
+      "id": 78,
+      "type": "CLIPTextEncode",
+      "pos": [
+        440.4971577369176,
+        -338.1115463391088
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 88
+        },
+        {
+          "localized_name": "\u6587\u672c",
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "\u6761\u4ef6",
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            91
+          ]
+        }
+      ],
+      "title": "\u6b63\u9762\u63d0\u793a\u8bcd\uff08\u4f60\u8981\u753b\u7684\u4e1c\u897f\uff0c\u5199\u5728\u8fd9\uff09",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "masterpiece, best quality, score_7, @dksnstyle, safety,\n1girl, solo, long light blue hair, blue eyes, hair ribbon, gentle smile, white blouse, garden, flowers, soft sunlight, spring breeze, detailed background, anime style"
+      ],
+      "widgets_values_named": {
+        "text": "masterpiece, best quality, score_7, @dksnstyle, safety,\n1girl, solo, long light blue hair, blue eyes, hair ribbon, gentle smile, white blouse, garden, flowers, soft sunlight, spring breeze, detailed background, anime style"
+      }
+    },
+    {
+      "id": 79,
+      "type": "CLIPTextEncode",
+      "pos": [
+        438.97171655291413,
+        -62.77742711230699
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 89
+        },
+        {
+          "localized_name": "\u6587\u672c",
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "\u6761\u4ef6",
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            90
+          ]
+        }
+      ],
+      "title": "\u8d1f\u9762\u63d0\u793a\u8bcd\uff08\u4f60\u4e0d\u60f3\u8ba9\u753b\u9762\u4e2d\u51fa\u73b0\u7684\u4e1c\u897f\uff0c\u5199\u5728\u8fd9\uff09",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "(worst_quality:1.4), (low_quality:1.4), (bad_anatomy:1.2), (bad_hands:1.3), (missing_fingers:1.3), (extra_fingers:1.3), extra_limbs, fused_fingers, deformed, disfigured, blurry, jpeg_artifacts, text, watermark, signature, username, error, cropped, out_of_frame, modern_clothes, cityscape, bright_sunlight, outdoors"
+      ],
+      "widgets_values_named": {
+        "text": "(worst_quality:1.4), (low_quality:1.4), (bad_anatomy:1.2), (bad_hands:1.3), (missing_fingers:1.3), (extra_fingers:1.3), extra_limbs, fused_fingers, deformed, disfigured, blurry, jpeg_artifacts, text, watermark, signature, username, error, cropped, out_of_frame, modern_clothes, cityscape, bright_sunlight, outdoors"
+      }
+    },
+    {
+      "id": 80,
+      "type": "EmptyLatentImage",
+      "pos": [
+        446.682860757865,
+        198.31129633554488
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "\u5bbd\u5ea6",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u9ad8\u5ea6",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "\u6279\u91cf\u5927\u5c0f",
+          "name": "batch_size",
+          "type": "INT",
+          "widget": {
+            "name": "batch_size"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "Latent",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            92
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage"
+      },
+      "widgets_values": [
+        1080,
+        1920,
+        1
+      ],
+      "widgets_values_named": {
+        "width": 1080,
+        "height": 1920,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 81,
+      "type": "VAEDecode",
+      "pos": [
+        1191.7415113033667,
+        245.86620706888775
+      ],
+      "size": [
+        140,
+        46
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "Latent",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 93
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 94
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "\u56fe\u50cf",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            98
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 87,
+      "type": "SaveImage",
+      "pos": [
+        1485.5823944546169,
+        239.5949184673783
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "\u56fe\u7247",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 98
+        },
+        {
+          "localized_name": "\u6587\u4ef6\u540d\u524d\u7f00",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "tina_mcp_test"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "ComfyUI"
+      }
+    }
+  ],
+  "links": [
+    [
+      85,
+      74,
+      0,
+      76,
+      0,
+      "MODEL"
+    ],
+    [
+      86,
+      72,
+      0,
+      76,
+      1,
+      "CLIP"
+    ],
+    [
+      87,
+      76,
+      0,
+      77,
+      0,
+      "MODEL"
+    ],
+    [
+      88,
+      76,
+      1,
+      78,
+      0,
+      "CLIP"
+    ],
+    [
+      89,
+      76,
+      1,
+      79,
+      0,
+      "CLIP"
+    ],
+    [
+      90,
+      79,
+      0,
+      77,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      91,
+      78,
+      0,
+      77,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      92,
+      80,
+      0,
+      77,
+      3,
+      "LATENT"
+    ],
+    [
+      93,
+      77,
+      0,
+      81,
+      0,
+      "LATENT"
+    ],
+    [
+      94,
+      73,
+      0,
+      81,
+      1,
+      "VAE"
+    ],
+    [
+      98,
+      81,
+      0,
+      87,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9090909090909095,
+      "offset": [
+        329.83524812840994,
+        644.1702332664834
+      ]
+    }
+  },
+  "version": 0.4
+}

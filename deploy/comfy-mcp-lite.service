@@ -1,0 +1,26 @@
+[Unit]
+Description=comfy-mcp-lite (ComfyUI MCP server)
+After=network-online.target
+Wants=network-online.target
+# ComfyUI 在同机；若 ComfyUI 也是 systemd 服务，可加 After=/Requires= 联动
+
+[Service]
+Type=simple
+User=baigong
+Group=baigong
+WorkingDirectory=/opt/comfy-mcp-lite
+# 令牌放独立 env 文件，权限收紧（chmod 600，root:baigong）
+EnvironmentFile=/etc/comfy-mcp-lite.env
+ExecStart=/opt/comfy-mcp-lite/.venv/bin/comfy-mcp-lite
+Restart=on-failure
+RestartSec=3
+
+# 加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target
