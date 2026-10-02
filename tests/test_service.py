@@ -118,6 +118,62 @@ async def test_http_401_without_token(env) -> None:
             assert resp.status_code == 401, headers
 
 
+# ---- 响应格式（JSON 模式，防大图断流）----
+
+async def test_tool_call_response_is_json_not_sse(env) -> None:
+    """POST /mcp 的 tool 调用响应必须是 application/json，不得走 SSE。
+
+    回归：SSE 模式下 httpx2>=2.13 的解析器有单事件 1MiB 硬限制，
+    base64 内联大图（原始 >约 768KB，如 4K 图）会触发
+    "SSE stream ended without a response"。json_response=True 让
+    响应整体 JSON 返回，绕过 SSE 解析器。
+    """
+    headers = {
+        "Authorization": f"Bearer {_TOKEN}",
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+    async with httpx2.AsyncClient(timeout=httpx2.Timeout(30, read=300)) as http:
+        resp = await http.post(
+            env.mcp_url,
+            headers=headers,
+            json={
+                "jsonrpc": "2.0", "id": 1, "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "raw", "version": "0"},
+                },
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("application/json")
+        session_id = resp.headers.get("mcp-session-id")
+        assert session_id, "会话 ID 必须下发"
+        headers["mcp-session-id"] = session_id
+
+        await http.post(
+            env.mcp_url, headers=headers,
+            json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+        )
+
+        resp = await http.post(
+            env.mcp_url,
+            headers=headers,
+            json={
+                "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                "params": {"name": "list_workflows", "arguments": {}},
+            },
+        )
+        assert resp.status_code == 200
+        # 核心：text/event-stream 会让大图在 SSE 解析器处断流
+        assert not resp.headers["content-type"].startswith("text/event-stream")
+        assert resp.headers["content-type"].startswith("application/json")
+        body = resp.json()
+        assert body["id"] == 2
+        assert body["result"]["content"], "工具结果必须整体在同一个 JSON 响应里"
+
+
 # ---- 工具可见性 ----
 
 async def test_tools_exposed(env) -> None:

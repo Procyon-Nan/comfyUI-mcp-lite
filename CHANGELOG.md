@@ -12,3 +12,7 @@
   字段地址对账校验（未知/跨类地址报错并回列可填字段）；离线测试套件 34 项
   （真实 .98 fixtures + 假 ComfyUI 的端到端 MCP 协议冒烟）；systemd 部署单元
   与中文文档。
+- pending: 修复大图断流：StreamableHTTP 改为 json_response=True，tool 结果整体
+  application/json 返回，绕过 SSE 解析器的单事件 1MiB 硬限制（base64 内联图
+  原始 >约 768KB，如 4K 图，此前必报 "SSE stream ended without a response"）；
+  新增回归测试断言 tools/call 响应为 application/json 而非 text/event-stream。
