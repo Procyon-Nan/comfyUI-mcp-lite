@@ -5,9 +5,12 @@
 任何端侧 agent（Hermes、ChatLuna/Koishi、Claude……）连上就能用，
 ComfyUI 与 agent 不必同机。
 
-- 端点：`http://<B 机>:9101/mcp`（StreamableHTTP），Bearer 鉴权
+- 端点：`http://<B 机>:9101/mcp`（StreamableHTTP），Bearer 鉴权；另有
+  `GET /images/{prompt_id}/{index}?e=&s=` 签名图片端点（免 Bearer，v0.2）
 - 工具：`list_workflows` / `run_workflow` / `get_image`
-- 图片一律 base64 字节内联返回，不暴露 ComfyUI 地址
+- 图片 base64 字节内联返回；设置 `PUBLIC_BASE_URL` 后结果 JSON 另附
+  可公开抓取的签名图片 urls（ChatLuna 类发图组件用）。图片流量经本服务
+  代理，不暴露 ComfyUI 地址
 
 ## 快速开始
 
@@ -28,8 +31,10 @@ export MCP_AUTH_TOKEN=<长随机串>
 |---|---|---|
 | `COMFYUI_URL` | `http://127.0.0.1:8188` | ComfyUI 地址（服务器与它同机，默认回环） |
 | `MCP_HOST` | `0.0.0.0` | HTTP 绑定地址（跨机访问） |
-| `MCP_PORT` | `9101` | HTTP 端口 |
-| `MCP_AUTH_TOKEN` | 无（必设） | 客户端 → 本服务器的 Bearer 校验 |
+| `MCP_PORT` | `9101` | HTTP 端口（`/mcp` 与 `/images` 共用，frpc 无需改动） |
+| `MCP_AUTH_TOKEN` | 无（必设） | 客户端 → 本服务器的 Bearer 校验；同时是图片签名 URL 的 HMAC 密钥 |
+| `PUBLIC_BASE_URL` | 空 | 签名图片 urls 的公网前缀（如 `http://118.25.74.121:9101`），须以 `http://` 或 `https://` 开头；未设则结果不带 urls（v0.1 行为） |
+| `IMAGE_URL_TTL_SECONDS` | `3600` | 签名图片 URL 的有效秒数 |
 
 ## 工具
 
@@ -71,7 +76,17 @@ export MCP_AUTH_TOKEN=<长随机串>
 ## 返回格式说明
 
 图片通过 MCP 原生 `ImageContent`（base64）内联返回；每个工具结果的第一块
-文本是状态 JSON（`status` / `prompt_id` / 图片数）。
+文本是状态 JSON（`status` / `prompt_id` / 图片数）。设置 `PUBLIC_BASE_URL` 后，
+该 JSON 额外带 `urls`（可公开抓取的签名图片地址，顺序与内联图块一致）：
+
+```json
+{"status": "completed", "prompt_id": "…", "images": 1,
+ "urls": ["http://118.25.74.121:9101/images/…/0?e=1790958000&s=<hmac>"]}
+```
+
+`urls` 无需任何鉴权头即可 GET（HMAC 签名 + 过期时间即鉴权，默认 1 小时）；
+index 可带 `.ext` 后缀（如 `0.png`，仅供发图组件识别类型）。依赖 ComfyUI
+output/history 未被清理（与 `get_image` 时效性相同）。
 
 ## 客户端接入
 
@@ -83,6 +98,8 @@ hermes mcp add comfy --url http://<B 地址>:9101/mcp --auth header
 
 ChatLuna（chatluna-agent 插件）：连接类型 HTTP，服务 URL `http://<B 地址>:9101/mcp`，
 请求头 `{"Authorization": "Bearer <MCP_AUTH_TOKEN>"}`，工具调用超时建议 120 秒。
+发图组件只吃 URL 的场景：在服务器设置 `PUBLIC_BASE_URL=http://<B 地址>:9101`，
+工具结果文本 JSON 里的 `urls` 即可直接抓取发送。
 
 ## 工作流格式说明
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-02 version:0.2.0
+
+- pending: 新增图片签名 URL：GET /images/{prompt_id}/{index}[.ext]?e=&s= 端点
+  免 Bearer（发图组件不带 Authorization 头），鉴权走查询串 HMAC-SHA256
+  签名（key=MCP_AUTH_TOKEN，message="prompt_id:index:e"，e 为 unix 过期
+  时间），校验失败/过期 403，任务无记录或下标越界 404，实时代理 ComfyUI
+  /view 返回图片字节（.ext 后缀仅识别用，取点前数字作 index）；新增
+  signing.py（签名生成/校验共用同一算法，compare_digest 防时序侧信道）。
+  run_workflow / get_image 完成态文本 JSON 在设置 PUBLIC_BASE_URL 时附带
+  urls（顺序与内联图块一致，get_image 选定 index 时用产物全集原始下标），
+  内联 base64 图块保持不变（Hermes 兼容）。新增配置 PUBLIC_BASE_URL（须
+  http(s):// 开头，未设则不出现 urls，行为与 v0.1 一致）与
+  IMAGE_URL_TTL_SECONDS（默认 3600）。build_app 改为 Starlette 顶层路由
+  （/images 免鉴权，其余含 /mcp 走 Bearer 中间件，顶层接管内层 lifespan
+  启动会话管理器），ComfyClient 由 build_app 创建并在工具与图片端点间共享。
+  版本 0.0.1 → 0.2.0；补 v0.2 规格 8 条测试与配置校验测试（共 53 项）。
+
 ## 2026-10-02 version:0.0.1
 
 - 92380e0: 初始实现：三个 MCP 工具（list_workflows / run_workflow / get_image，

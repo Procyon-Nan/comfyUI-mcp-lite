@@ -2,6 +2,9 @@
 正好覆盖轮询兜底路径）。覆盖验收标准里可在无 ComfyUI 环境验证的条款：
 401 三态、工具可见性、list 结构、run 出图（内联）、原值兜底、超时/running/
 completed 状态机、参考图两种图源、错误信息明确性。
+
+v0.2：图片签名 URL 端点（免 Bearer、HMAC 查询串签名、过期、403/404、
+.ext 后缀容忍）与工具结果 urls 字段（PUBLIC_BASE_URL 设/未设）。
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ import asyncio
 import base64
 import contextlib
 import json
+import socket
 import types
 from typing import Any
 
@@ -23,6 +27,7 @@ from comfy_mcp_lite.comfy import ComfyClient
 from comfy_mcp_lite.config import Config
 from comfy_mcp_lite.images import resolve_image_source
 from comfy_mcp_lite.server import build_app
+from comfy_mcp_lite.signing import build_image_url
 from fake_comfy import FakeComfy
 
 _TINY_PNG = base64.b64decode(
@@ -32,9 +37,9 @@ _TINY_PNG = base64.b64decode(
 _TOKEN = "test-token"
 
 
-async def _start_server(app: Any) -> tuple[uvicorn.Server, asyncio.Task, int]:
+async def _start_server(app: Any, port: int = 0) -> tuple[uvicorn.Server, asyncio.Task, int]:
     # lifespan 必须开：MCPServer 的会话管理器靠它启动
-    config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error")
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
     server = uvicorn.Server(config)
     task = asyncio.create_task(server.serve())
     for _ in range(300):
@@ -47,25 +52,52 @@ async def _start_server(app: Any) -> tuple[uvicorn.Server, asyncio.Task, int]:
     return server, task, port
 
 
-@pytest.fixture
-async def env(simple_ui: dict, object_info: dict):
+def _free_port() -> int:
+    # 预占一个空闲端口：public 模式下 PUBLIC_BASE_URL 要在启动前指向服务自身
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+@contextlib.asynccontextmanager
+async def _env(simple_ui: dict, object_info: dict, public: bool = False):
+    """起假 ComfyUI + 真服务；public=True 时配置指向自身的 PUBLIC_BASE_URL。"""
     fake = FakeComfy({"simple.json": simple_ui}, object_info)
     fake_server, fake_task, fake_port = await _start_server(fake.build())
+    # public 模式需固定端口：urls 的公网前缀必须在 build_app 之前拼好
+    mcp_port = _free_port() if public else 0
     config = Config(
         comfyui_url=f"http://127.0.0.1:{fake_port}",
         mcp_host="127.0.0.1",
-        mcp_port=0,
+        mcp_port=mcp_port,
         auth_token=_TOKEN,
+        public_base_url=f"http://127.0.0.1:{mcp_port}" if public else "",
     )
-    mcp_server, mcp_task, mcp_port = await _start_server(build_app(config))
-    yield types.SimpleNamespace(
-        fake=fake,
-        fake_port=fake_port,
-        mcp_url=f"http://127.0.0.1:{mcp_port}/mcp",
-    )
-    for server, task in ((fake_server, fake_task), (mcp_server, mcp_task)):
-        server.should_exit = True
-        await asyncio.wait_for(task, 5)
+    mcp_server, mcp_task, mcp_port = await _start_server(build_app(config), port=mcp_port)
+    try:
+        yield types.SimpleNamespace(
+            fake=fake,
+            fake_port=fake_port,
+            mcp_port=mcp_port,
+            mcp_url=f"http://127.0.0.1:{mcp_port}/mcp",
+        )
+    finally:
+        for server, task in ((fake_server, fake_task), (mcp_server, mcp_task)):
+            server.should_exit = True
+            await asyncio.wait_for(task, 5)
+
+
+@pytest.fixture
+async def env(simple_ui: dict, object_info: dict):
+    async with _env(simple_ui, object_info) as e:
+        yield e
+
+
+@pytest.fixture
+async def env_public(simple_ui: dict, object_info: dict):
+    """配置了 PUBLIC_BASE_URL 的环境：工具结果带可公开抓取的签名 urls。"""
+    async with _env(simple_ui, object_info, public=True) as e:
+        yield e
 
 
 @contextlib.asynccontextmanager
@@ -101,7 +133,7 @@ def _error_text(result: Any) -> str:
     return result.content[0].text
 
 
-# ---- 鉴权（验收条 6/7 的 HTTP 部分）----
+# ---- 鉴权（验收条 6/7 的 HTTP 部分；v0.2 规格条 7：/mcp 仍要求 Bearer）----
 
 async def test_http_401_without_token(env) -> None:
     async with httpx2.AsyncClient() as http:
@@ -338,3 +370,154 @@ async def test_image_source_rejects_garbage(env) -> None:
     client = ComfyClient(f"http://127.0.0.1:{env.fake_port}")
     with pytest.raises(ComfyError, match="不支持的参考图源"):
         await resolve_image_source(client, "/etc/passwd")
+
+
+# ---- 图片签名 URL（v0.2 规格 8 条）----
+
+
+async def _completed_prompt_id(env) -> str:
+    """跑一个即时完成的任务，返回 prompt_id。"""
+    async with mcp_session(env) as session:
+        result = await session.call_tool("run_workflow", {"workflow": "simple"})
+        payload = _text_payload(result)
+        assert payload["status"] == "completed"
+        return payload["prompt_id"]
+
+
+def _image_url(env, prompt_id: str, index: int, *, token: str = _TOKEN, ttl: int = 3600, ext: str = "") -> str:
+    """测试侧拼签名 URL（与 signing.build_image_url 同一算法）；ext 模拟发图组件带后缀。"""
+    url = build_image_url(f"http://127.0.0.1:{env.mcp_port}", token, prompt_id, index, ttl)
+    if ext:
+        url = url.replace(f"/{index}?", f"/{index}.{ext}?")
+    return url
+
+
+async def test_image_url_valid_signature_returns_bytes(env) -> None:
+    """规格条 1/6：签名正确且未过期 → 不带 Authorization 也能 200 取回图片字节。"""
+    prompt_id = await _completed_prompt_id(env)
+    async with httpx2.AsyncClient() as http:
+        resp = await http.get(_image_url(env, prompt_id, 0))  # 无鉴权头
+        assert resp.status_code == 200
+        assert resp.content == _TINY_PNG
+        assert resp.headers["content-type"] == "image/png"
+
+
+async def test_image_url_wrong_signature_403(env) -> None:
+    """规格条 2：签名错误（按错误 token 签）→ 403。"""
+    prompt_id = await _completed_prompt_id(env)
+    async with httpx2.AsyncClient() as http:
+        resp = await http.get(_image_url(env, prompt_id, 0, token="wrong-token"))
+        assert resp.status_code == 403
+
+
+async def test_image_url_expired_403(env) -> None:
+    """规格条 3：e 已在过去（负 TTL）→ 403。"""
+    prompt_id = await _completed_prompt_id(env)
+    async with httpx2.AsyncClient() as http:
+        resp = await http.get(_image_url(env, prompt_id, 0, ttl=-10))
+        assert resp.status_code == 403
+
+
+async def test_image_url_missing_or_bad_query_403(env) -> None:
+    """规格条 4：缺 e / 缺 s / e 非数字 / 无查询串 → 403。"""
+    prompt_id = await _completed_prompt_id(env)
+    good = _image_url(env, prompt_id, 0)
+    base, query = good.split("?", 1)
+    e_part, s_part = query.split("&", 1)  # e=... / s=...
+    cases = [base, f"{base}?{s_part}", f"{base}?{e_part}", f"{base}?e=abc&{s_part}"]
+    async with httpx2.AsyncClient() as http:
+        for url in cases:
+            resp = await http.get(url)
+            assert resp.status_code == 403, url
+
+
+async def test_image_url_unknown_prompt_or_index_out_of_range_404(env) -> None:
+    """规格条 5：prompt_id 不存在 → 404；index 越界 → 404。"""
+    prompt_id = await _completed_prompt_id(env)  # 该任务只有 1 张图
+    async with httpx2.AsyncClient() as http:
+        for url in (_image_url(env, "no-such-id", 0), _image_url(env, prompt_id, 99)):
+            resp = await http.get(url)
+            assert resp.status_code == 404, url
+
+
+async def test_image_url_tolerates_extension_suffix(env) -> None:
+    """路由规格：{index} 容忍 .ext 后缀（如 0.png），取点前数字作 index。"""
+    prompt_id = await _completed_prompt_id(env)
+    async with httpx2.AsyncClient() as http:
+        resp = await http.get(_image_url(env, prompt_id, 0, ext="png"))
+        assert resp.status_code == 200
+        assert resp.content == _TINY_PNG
+
+
+async def test_tool_results_include_urls_when_public_base_url_set(env_public) -> None:
+    """规格条 8（已设）：run_workflow / get_image 结果带 urls，且原样无鉴权可抓。"""
+    async with mcp_session(env_public) as session:
+        result = await session.call_tool("run_workflow", {"workflow": "simple"})
+        payload = _text_payload(result)
+        assert payload["status"] == "completed"
+        assert len(payload["urls"]) == payload["images"] == 1
+        url = payload["urls"][0]
+        base = f"http://127.0.0.1:{env_public.mcp_port}"
+        assert url.startswith(f"{base}/images/{payload['prompt_id']}/0?")
+        assert "e=" in url and "s=" in url
+
+        result = await session.call_tool("get_image", {"prompt_id": payload["prompt_id"]})
+        assert len(_text_payload(result)["urls"]) == 1
+    async with httpx2.AsyncClient() as http:
+        resp = await http.get(url)  # 工具给的 URL 原样抓取，无 Authorization
+        assert resp.status_code == 200
+        assert resp.content == _TINY_PNG
+
+
+async def test_tool_results_without_public_base_url_have_no_urls(env) -> None:
+    """规格条 8（未设）：不出现 urls 字段，行为与 v0.1 一致。"""
+    async with mcp_session(env) as session:
+        result = await session.call_tool("run_workflow", {"workflow": "simple"})
+        payload = _text_payload(result)
+        assert "urls" not in payload
+        result = await session.call_tool("get_image", {"prompt_id": payload["prompt_id"]})
+        assert "urls" not in _text_payload(result)
+
+
+async def test_multi_image_urls_follow_block_order(env_public) -> None:
+    """多图逐张给 urls，顺序与内联图块一致（下标 0..n-1）。"""
+    async with mcp_session(env_public) as session:
+        result = await session.call_tool("run_workflow", {"workflow": "simple"})
+        prompt_id = _text_payload(result)["prompt_id"]
+        env_public.fake.complete(prompt_id, images=[
+            {"filename": "ComfyUI_00001_.png", "subfolder": "", "type": "output"},
+            {"filename": "ComfyUI_00002_.png", "subfolder": "", "type": "output"},
+        ])
+        result = await session.call_tool("get_image", {"prompt_id": prompt_id, "index": 99})  # 越界 → 全量
+        payload = _text_payload(result)
+        assert payload["images"] == 2
+        assert len(payload["urls"]) == 2
+        base = f"http://127.0.0.1:{env_public.mcp_port}"
+        assert payload["urls"][0].startswith(f"{base}/images/{prompt_id}/0?")
+        assert payload["urls"][1].startswith(f"{base}/images/{prompt_id}/1?")
+    async with httpx2.AsyncClient() as http:
+        for url in payload["urls"]:
+            resp = await http.get(url)
+            assert resp.status_code == 200
+            assert resp.content == _TINY_PNG
+
+
+async def test_get_image_selected_index_keeps_original_index_in_url(env_public) -> None:
+    """get_image 选定 index 时，url 的下标仍是产物全集中的原始位置。"""
+    async with mcp_session(env_public) as session:
+        result = await session.call_tool("run_workflow", {"workflow": "simple"})
+        prompt_id = _text_payload(result)["prompt_id"]
+        env_public.fake.complete(prompt_id, images=[
+            {"filename": "ComfyUI_00001_.png", "subfolder": "", "type": "output"},
+            {"filename": "ComfyUI_00002_.png", "subfolder": "", "type": "output"},
+        ])
+        result = await session.call_tool("get_image", {"prompt_id": prompt_id, "index": 1})
+        payload = _text_payload(result)
+        assert payload["images"] == 1
+        assert len(payload["urls"]) == 1
+        url = payload["urls"][0]
+        assert f"/images/{prompt_id}/1?" in url
+    async with httpx2.AsyncClient() as http:
+        resp = await http.get(url)
+        assert resp.status_code == 200
+        assert resp.content == _TINY_PNG

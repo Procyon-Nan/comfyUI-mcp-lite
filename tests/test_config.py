@@ -47,3 +47,41 @@ def test_bad_port(monkeypatch: pytest.MonkeyPatch, bad: str) -> None:
     monkeypatch.setenv("MCP_PORT", bad)
     with pytest.raises(ConfigError):
         Config.from_env()
+
+
+def test_public_base_url_and_ttl_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "secret")
+    for var in ("PUBLIC_BASE_URL", "IMAGE_URL_TTL_SECONDS"):
+        monkeypatch.delenv(var, raising=False)
+    config = Config.from_env()
+    assert config.public_base_url == ""  # 未设 → 不返回 urls（v0.1 行为）
+    assert config.image_url_ttl_seconds == 3600
+
+
+def test_public_base_url_and_ttl_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "secret")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://example.com/")
+    monkeypatch.setenv("IMAGE_URL_TTL_SECONDS", "7200")
+    config = Config.from_env()
+    assert config.public_base_url == "https://example.com/"
+    assert config.image_url_ttl_seconds == 7200
+
+
+@pytest.mark.parametrize("bad", ["ftp://example.com", "example.com:9101", "/images"])
+def test_public_base_url_bad_scheme_refuses_startup(
+    monkeypatch: pytest.MonkeyPatch, bad: str
+) -> None:
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "secret")
+    monkeypatch.setenv("PUBLIC_BASE_URL", bad)
+    with pytest.raises(ConfigError, match="PUBLIC_BASE_URL"):
+        Config.from_env()
+
+
+@pytest.mark.parametrize("bad", ["abc", "0", "-5"])
+def test_image_url_ttl_bad_value_refuses_startup(
+    monkeypatch: pytest.MonkeyPatch, bad: str
+) -> None:
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "secret")
+    monkeypatch.setenv("IMAGE_URL_TTL_SECONDS", bad)
+    with pytest.raises(ConfigError, match="IMAGE_URL_TTL_SECONDS"):
+        Config.from_env()

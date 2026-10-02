@@ -4,7 +4,10 @@
 该工作流转换产物中真实存在的 node_id.field（与 list_workflows 报出的
 一致），未知地址与跨类地址都报错并回列可填字段，绝不静默忽略。
 
-图片一律内联返回（MCP ImageContent，base64 字节），不返回 URL。
+图片以内联（MCP ImageContent，base64 字节）为主返回；配置了
+PUBLIC_BASE_URL 时（v0.2），结果文本 JSON 额外带签名图片 urls，
+供 ChatLuna 类只吃 URL 的发图组件直接抓取；未配置则不出现
+urls 字段，行为与 v0.1 完全一致。
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import base64
 import json
 import mimetypes
 import uuid
-from typing import Any
+from typing import Any, Iterable
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ImageContent, TextContent
@@ -29,6 +32,7 @@ from .converter import Converter
 from .discover import discover_fields
 from .images import resolve_image_source
 from .progress import wait_for_completion
+from .signing import build_image_url
 
 
 def _text(payload: dict[str, Any]) -> TextContent:
@@ -70,9 +74,33 @@ def _image_content(data: bytes, filename: str) -> ImageContent:
     encoded = base64.b64encode(data).decode("ascii")
     return ImageContent(type="image", data=encoded, mimeType=mime)
 
-def register(mcp: MCPServer, config: Config) -> None:
-    """在 MCPServer 实例上注册三个工具（闭包持有客户端与转换器）。"""
-    client = ComfyClient(config.comfyui_url)
+
+def _completed_payload(
+    config: Config, prompt_id: str, indices: Iterable[int], image_count: int
+) -> dict[str, Any]:
+    """完成态结果 JSON：状态 + 图片数；配置了 PUBLIC_BASE_URL 时附签名 urls。
+
+    indices 为各内联图块在产物全集中的下标（urls 顺序与内联图块一致）；
+    未配置 PUBLIC_BASE_URL 则不出现 urls 字段（v0.1 行为）。
+    """
+    payload: dict[str, Any] = {
+        "status": "completed", "prompt_id": prompt_id, "images": image_count
+    }
+    if config.public_base_url:
+        payload["urls"] = [
+            build_image_url(
+                config.public_base_url, config.auth_token, prompt_id, i, config.image_url_ttl_seconds
+            )
+            for i in indices
+        ]
+    return payload
+
+def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
+    """在 MCPServer 实例上注册三个工具。
+
+    client 由 build_app 创建并传入：与 /images 图片端点共用同一个
+    ComfyClient（闭包持转换器与 client_id）。
+    """
     converter = Converter(client)
     client_id = uuid.uuid4().hex  # WS 订阅与任务提交共用的身份
 
@@ -111,6 +139,8 @@ def register(mcp: MCPServer, config: Config) -> None:
         data:image/png;base64,...）或 http(s) URL（服务器代下载后自动上传）。
         不填的字段保持工作流原值。等待超过 timeout_seconds 时返回
         {"status":"timeout","prompt_id":...}（不含图），之后可用 get_image 补取。
+        服务器配置了 PUBLIC_BASE_URL 时，结果 JSON 还带 urls（可公开抓取的
+        签名图片地址，默认 1 小时有效）。
         """
         if timeout_seconds <= 0:
             raise ComfyError("timeout_seconds 必须为正数")
@@ -166,7 +196,7 @@ def register(mcp: MCPServer, config: Config) -> None:
             for m in metas
         ]
         return [
-            _text({"status": "completed", "prompt_id": prompt_id, "images": len(blocks)}),
+            _text(_completed_payload(config, prompt_id, range(len(metas)), len(blocks))),
             *blocks,
         ]
 
@@ -176,6 +206,8 @@ def register(mcp: MCPServer, config: Config) -> None:
 
         已完成返回 {"status":"completed"} 并内联附上图片；仍在执行返回
         {"status":"running"}；index 选第几张（从 0 起），越界则返回全部。
+        服务器配置了 PUBLIC_BASE_URL 时，结果 JSON 还带 urls（可公开抓取的
+        签名图片地址，默认 1 小时有效）。
         """
         entry = await client.get_history_entry(prompt_id)
         if entry is None:
@@ -190,13 +222,15 @@ def register(mcp: MCPServer, config: Config) -> None:
         metas = history_output_images(entry)
         if not metas:
             raise ComfyError("任务已完成但未产出图片（工作流里需要 SaveImage 类输出节点）")
+        # 保留产物全集中的原始下标：签名 URL 的 index 与 /images 端点对齐
+        selected = list(enumerate(metas))
         if 0 <= index < len(metas):
-            metas = [metas[index]]
+            selected = [selected[index]]
         blocks = [
             _image_content(await client.fetch_image(m["filename"], m["subfolder"], m["type"]), m["filename"])
-            for m in metas
+            for _, m in selected
         ]
         return [
-            _text({"status": "completed", "prompt_id": prompt_id, "images": len(blocks)}),
+            _text(_completed_payload(config, prompt_id, [i for i, _ in selected], len(blocks))),
             *blocks,
         ]

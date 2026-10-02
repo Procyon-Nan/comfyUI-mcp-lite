@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfy-mcp-lite"
-version = "0.0.1"
+version = "0.2.0"
 description = "轻量 ComfyUI MCP 服务器：用已有工作流生图（HTTP /mcp + Bearer 鉴权）"
 readme = "README.md"
 license = { text = "MIT" }
@@ -14,6 +14,8 @@ dependencies = [
     "websockets>=13",
     "pydantic>=2.7",
     "uvicorn>=0.30",
+    # server.py 顶层路由直接 import starlette（mcp SDK 亦依赖，此处显式声明）
+    "starlette>=0.37",
     # 仅用其 comfy_cli.workflow_to_api.convert_ui_to_api（UI 格式 → API 格式转换），
     # 不使用其 CLI。版本钉死为 B 机已验证版本。
     "comfy-cli==1.22.0",
