@@ -5,13 +5,13 @@
 
 三类来源（规格固定）：
 - prompts ← CLIPTextEncode.text
-- numbers ← EmptyLatentImage.width / .height
+- numbers ← 尺寸节点白名单（EmptyLatentImage、LatentUpscale）的 .width / .height
 - images  ← LoadImage.image
 
 label 优先级（规格 §4.1）：
 1. 节点标题：转换器保留在 _meta.title；仅当用户自定义过（非空且不等于节点类型名）才采用
 2. 类型 + 连线：CLIPTextEncode 连到 KSampler(.Advanced) 的 positive → 「正面提示词」、negative → 「负面提示词」
-3. 类型默认：EmptyLatentImage.width → 「宽度」、height → 「高度」、
+3. 类型默认：白名单尺寸节点的 width/height → 「宽度」/「高度」、
    LoadImage.image → 「参考图（图生图底图）」
 4. 都不行 → label: null（地址仍可调用）
 """
@@ -21,7 +21,13 @@ from __future__ import annotations
 from typing import Any
 
 _PROMPT_NODE = "CLIPTextEncode"
-_LATENT_NODE = "EmptyLatentImage"
+# latent 尺寸节点白名单：这些节点的 width/height 输入按 numbers 类收
+# （EmptyLatentImage 定初始尺寸，LatentUpscale 重设尺寸，如图生图.json #96）。
+# 以后新增别的架构节点（能控制潜空间尺寸的）往这里加即可。
+_LATENT_SIZE_NODES = frozenset({
+    "EmptyLatentImage",
+    "LatentUpscale",
+})
 _IMAGE_NODE = "LoadImage"
 _SAMPLER_TYPES = frozenset({"KSampler", "KSamplerAdvanced"})
 
@@ -96,7 +102,7 @@ def discover_fields(
         if not isinstance(node, dict):
             continue
         class_type = node.get("class_type")
-        if class_type not in (_PROMPT_NODE, _LATENT_NODE, _IMAGE_NODE):
+        if class_type not in (_PROMPT_NODE, *_LATENT_SIZE_NODES, _IMAGE_NODE):
             continue
         inputs = node.get("inputs") or {}
         display_name = (object_info or {}).get(class_type, {}).get("display_name") or class_type
@@ -112,7 +118,7 @@ def discover_fields(
                         label = _LABEL_NEGATIVE
                 _add(result, "prompts", node_id, "text", label)
 
-        elif class_type == _LATENT_NODE:
+        elif class_type in _LATENT_SIZE_NODES:
             for field, default in (("width", _LABEL_WIDTH), ("height", _LABEL_HEIGHT)):
                 if field in inputs:
                     _add(result, "numbers", node_id, field, title or default)

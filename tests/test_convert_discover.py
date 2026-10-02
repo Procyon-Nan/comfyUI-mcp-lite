@@ -107,3 +107,27 @@ def test_discover_loadimage_custom_title_wins() -> None:
                "_meta": {"title": "人物底图"}}}
     )
     assert fields["images"]["5.image"]["label"] == "人物底图"
+
+
+def test_discover_latent_upscale_numbers() -> None:
+    """LatentUpscale 的 width/height 也按 numbers 收（尺寸节点白名单），
+    label 走类型默认「宽度/高度」（图生图.json #96 的场景）。"""
+    fields = discover_fields(
+        {"96": {"class_type": "LatentUpscale", "inputs": {
+            "upscale_method": "nearest-exact", "width": 1024, "height": 768,
+        }}}
+    )
+    assert set(fields) == {"numbers"}
+    assert set(fields["numbers"]) == {"96.width", "96.height"}
+    assert fields["numbers"]["96.width"]["label"] == "宽度"
+    assert fields["numbers"]["96.height"]["label"] == "高度"
+
+
+def test_discover_latent_upscale_title_wins() -> None:
+    """LatentUpscale 自定义标题优先于类型默认（与 EmptyLatentImage 同优先级链）。"""
+    fields = discover_fields(
+        {"96": {"class_type": "LatentUpscale", "inputs": {"width": 1024, "height": 768},
+                "_meta": {"title": "放大后尺寸"}}}
+    )
+    assert fields["numbers"]["96.width"]["label"] == "放大后尺寸"
+    assert fields["numbers"]["96.height"]["label"] == "放大后尺寸"

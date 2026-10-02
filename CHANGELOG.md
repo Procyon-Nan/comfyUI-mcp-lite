@@ -16,6 +16,12 @@
   （/images 免鉴权，其余含 /mcp 走 Bearer 中间件，顶层接管内层 lifespan
   启动会话管理器），ComfyClient 由 build_app 创建并在工具与图片端点间共享。
   版本 0.0.1 → 0.2.0；补 v0.2 规格 8 条测试与配置校验测试（共 53 项）。
+- pending: numbers 字段来源改为「latent 尺寸节点白名单」：新增
+  _LATENT_SIZE_NODES（现含 EmptyLatentImage、LatentUpscale，后续架构
+  节点加进白名单即可）；LatentUpscale 的 width/height 此前不识别，
+  导致用其控尺寸的工作流（如图生图.json #96）numbers 类为空。label
+  优先级链不变（节点标题 → 类型默认「宽度/高度」），EmptyLatentImage
+  行为不变；补 LatentUpscale 收录与标题优先两测试。
 - pending: LoadImage.image 的 label 增加类型默认兜底「参考图（图生图底图）」：
   此前仅节点自定义标题可用（无标题即 null）；现与 width/height 相同的
   优先级链（节点标题 → 类型默认），discover 文档与 README 同步更新，
