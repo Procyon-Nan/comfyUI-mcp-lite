@@ -91,9 +91,19 @@ def test_discover_unwired_prompt_label_null() -> None:
     assert fields["prompts"]["78.text"]["label"] is None
 
 
-def test_discover_loadimage() -> None:
+def test_discover_loadimage_default_label() -> None:
+    """无自定义标题的 LoadImage.image → 类型默认 label（与宽高同模式）。"""
     fields = discover_fields(
         {"5": {"class_type": "LoadImage", "inputs": {"image": "x.png"}}}
     )
     assert set(fields) == {"images"}
-    assert fields["images"]["5.image"]["label"] is None  # 无默认表条目
+    assert fields["images"]["5.image"]["label"] == "参考图（图生图底图）"
+
+
+def test_discover_loadimage_custom_title_wins() -> None:
+    """节点自定义标题优先于类型默认 label（与 numbers 的兜底链一致）。"""
+    fields = discover_fields(
+        {"5": {"class_type": "LoadImage", "inputs": {"image": "x.png"},
+               "_meta": {"title": "人物底图"}}}
+    )
+    assert fields["images"]["5.image"]["label"] == "人物底图"

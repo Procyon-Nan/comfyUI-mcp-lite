@@ -16,6 +16,10 @@
   （/images 免鉴权，其余含 /mcp 走 Bearer 中间件，顶层接管内层 lifespan
   启动会话管理器），ComfyClient 由 build_app 创建并在工具与图片端点间共享。
   版本 0.0.1 → 0.2.0；补 v0.2 规格 8 条测试与配置校验测试（共 53 项）。
+- pending: LoadImage.image 的 label 增加类型默认兜底「参考图（图生图底图）」：
+  此前仅节点自定义标题可用（无标题即 null）；现与 width/height 相同的
+  优先级链（节点标题 → 类型默认），discover 文档与 README 同步更新，
+  测试改为断言默认 label 与标题优先两种情形。
 
 ## 2026-10-02 version:0.0.1
 

@@ -48,7 +48,9 @@ export MCP_AUTH_TOKEN=<长随机串>
 ```
 
 - 空类省略键（无参考图入口的工作流不出现 `images`）
-- `label` 为 null 表示未识别出语义，地址仍可直接调用
+- 含 LoadImage 的工作流报出 `images` 地址（如 `"5.image"`），label 默认
+  「参考图（图生图底图）」，节点自定义标题优先
+- `label` 为 null 表示未识别出语义，地址仍可直接调用（仅出现在 prompts）
 - 不填的字段运行时用工作流原值
 
 ### run_workflow

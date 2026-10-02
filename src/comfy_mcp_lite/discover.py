@@ -11,7 +11,8 @@
 label 优先级（规格 §4.1）：
 1. 节点标题：转换器保留在 _meta.title；仅当用户自定义过（非空且不等于节点类型名）才采用
 2. 类型 + 连线：CLIPTextEncode 连到 KSampler(.Advanced) 的 positive → 「正面提示词」、negative → 「负面提示词」
-3. 类型默认：EmptyLatentImage.width → 「宽度」、height → 「高度」
+3. 类型默认：EmptyLatentImage.width → 「宽度」、height → 「高度」、
+   LoadImage.image → 「参考图（图生图底图）」
 4. 都不行 → label: null（地址仍可调用）
 """
 
@@ -28,6 +29,7 @@ _LABEL_POSITIVE = "正面提示词"
 _LABEL_NEGATIVE = "负面提示词"
 _LABEL_WIDTH = "宽度"
 _LABEL_HEIGHT = "高度"
+_LABEL_REFERENCE = "参考图（图生图底图）"
 
 
 def _link_target(value: Any) -> str | None:
@@ -117,6 +119,7 @@ def discover_fields(
 
         elif class_type == _IMAGE_NODE:
             if "image" in inputs:
-                _add(result, "images", node_id, "image", title)
+                # 与 numbers 同模式：节点标题优先，否则类型默认 label
+                _add(result, "images", node_id, "image", title or _LABEL_REFERENCE)
 
     return result
