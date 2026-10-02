@@ -2,7 +2,7 @@
 
 ## 2026-10-02 version:0.0.1
 
-- pending: 初始实现：三个 MCP 工具（list_workflows / run_workflow / get_image，
+- 92380e0: 初始实现：三个 MCP 工具（list_workflows / run_workflow / get_image，
   基于 mcp 2.x SDK 的 MCPServer/StreamableHTTP，端点 /mcp）；
   Bearer 鉴权中间件（未设 MCP_AUTH_TOKEN 拒绝启动、无/错凭据 401）；
   comfy-cli 1.22.0 运行期 UI→API 转换（仅作库 import，object_info 进程内缓存
