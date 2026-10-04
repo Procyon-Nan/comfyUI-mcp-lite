@@ -10,9 +10,12 @@
 
 label 优先级（规格 §4.1）：
 1. 节点标题：转换器保留在 _meta.title；仅当用户自定义过（非空且不等于节点类型名）才采用
-2. 类型 + 连线：CLIPTextEncode 连到 KSampler(.Advanced) 的 positive → 「正面提示词」、negative → 「负面提示词」
-3. 类型默认：白名单尺寸节点的 width/height → 「宽度」/「高度」、
-   LoadImage.image → 「参考图（图生图底图）」
+2. 类型 + 连线：CLIPTextEncode 连到 KSampler(.Advanced) 的
+   positive → 「Positive prompt (中文：正面提示词)」、
+   negative → 「Negative prompt (中文：负面提示词)」
+3. 类型默认：白名单尺寸节点的 width/height →
+   「Width (中文：宽度)」/「Height (中文：高度)」、
+   LoadImage.image → 「Reference image (img2img base) (中文：参考图（图生图底图）)」
 4. 都不行 → label: null（地址仍可调用）
 """
 
@@ -31,11 +34,11 @@ _LATENT_SIZE_NODES = frozenset({
 _IMAGE_NODE = "LoadImage"
 _SAMPLER_TYPES = frozenset({"KSampler", "KSamplerAdvanced"})
 
-_LABEL_POSITIVE = "正面提示词"
-_LABEL_NEGATIVE = "负面提示词"
-_LABEL_WIDTH = "宽度"
-_LABEL_HEIGHT = "高度"
-_LABEL_REFERENCE = "参考图（图生图底图）"
+_LABEL_POSITIVE = "Positive prompt (中文：正面提示词)"
+_LABEL_NEGATIVE = "Negative prompt (中文：负面提示词)"
+_LABEL_WIDTH = "Width (中文：宽度)"
+_LABEL_HEIGHT = "Height (中文：高度)"
+_LABEL_REFERENCE = "Reference image (img2img base) (中文：参考图（图生图底图）)"
 
 
 def _link_target(value: Any) -> str | None:

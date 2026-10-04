@@ -41,8 +41,8 @@ def test_discover_labels(simple_ui: dict, object_info: dict) -> None:
     fields = discover_fields(prompt, object_info)
     assert fields["prompts"]["78.text"]["label"] == "正面提示词（你要画的东西，写在这）"
     assert fields["prompts"]["79.text"]["label"] == "负面提示词（你不想让画面中出现的东西，写在这）"
-    assert fields["numbers"]["80.width"]["label"] == "宽度"
-    assert fields["numbers"]["80.height"]["label"] == "高度"
+    assert fields["numbers"]["80.width"]["label"] == "Width (中文：宽度)"
+    assert fields["numbers"]["80.height"]["label"] == "Height (中文：高度)"
 
 
 
@@ -65,8 +65,8 @@ def test_discover_wiring_labels() -> None:
         "79": {"class_type": "CLIPTextEncode", "inputs": {"text": "b"}},
     }
     fields = discover_fields(prompt)
-    assert fields["prompts"]["78.text"]["label"] == "正面提示词"
-    assert fields["prompts"]["79.text"]["label"] == "负面提示词"
+    assert fields["prompts"]["78.text"]["label"] == "Positive prompt (中文：正面提示词)"
+    assert fields["prompts"]["79.text"]["label"] == "Negative prompt (中文：负面提示词)"
 
 
 def test_discover_title_priority() -> None:
@@ -81,7 +81,7 @@ def test_discover_title_priority() -> None:
     }
     fields = discover_fields(prompt)
     assert fields["prompts"]["78.text"]["label"] == "你要画的东西写在这"
-    assert fields["prompts"]["79.text"]["label"] == "负面提示词"
+    assert fields["prompts"]["79.text"]["label"] == "Negative prompt (中文：负面提示词)"
 
 
 def test_discover_unwired_prompt_label_null() -> None:
@@ -97,7 +97,7 @@ def test_discover_loadimage_default_label() -> None:
         {"5": {"class_type": "LoadImage", "inputs": {"image": "x.png"}}}
     )
     assert set(fields) == {"images"}
-    assert fields["images"]["5.image"]["label"] == "参考图（图生图底图）"
+    assert fields["images"]["5.image"]["label"] == "Reference image (img2img base) (中文：参考图（图生图底图）)"
 
 
 def test_discover_loadimage_custom_title_wins() -> None:
@@ -111,7 +111,7 @@ def test_discover_loadimage_custom_title_wins() -> None:
 
 def test_discover_latent_upscale_numbers() -> None:
     """LatentUpscale 的 width/height 也按 numbers 收（尺寸节点白名单），
-    label 走类型默认「宽度/高度」（图生图.json #96 的场景）。"""
+    label 走类型默认「Width (中文：宽度)」/「Height (中文：高度)」（图生图.json #96 的场景）。"""
     fields = discover_fields(
         {"96": {"class_type": "LatentUpscale", "inputs": {
             "upscale_method": "nearest-exact", "width": 1024, "height": 768,
@@ -119,8 +119,8 @@ def test_discover_latent_upscale_numbers() -> None:
     )
     assert set(fields) == {"numbers"}
     assert set(fields["numbers"]) == {"96.width", "96.height"}
-    assert fields["numbers"]["96.width"]["label"] == "宽度"
-    assert fields["numbers"]["96.height"]["label"] == "高度"
+    assert fields["numbers"]["96.width"]["label"] == "Width (中文：宽度)"
+    assert fields["numbers"]["96.height"]["label"] == "Height (中文：高度)"
 
 
 def test_discover_latent_upscale_title_wins() -> None:

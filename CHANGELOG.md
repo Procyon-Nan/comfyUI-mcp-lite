@@ -21,6 +21,14 @@
   （参数名、类型与默认值保持不变，未设置中文 title）。仅改描述文案，
   功能行为与测试断言均不变。
 
+- pending: 类型默认 label 的 5 个代码内常量（正面提示词/负面提示词/宽度/
+  高度/参考图（图生图底图））改为「简明英文 + (中文：直译)」格式，与工具/
+  参数描述的风格统一（Positive prompt / Negative prompt / Width / Height /
+  Reference image (img2img base)）；用户自定义标题的处理逻辑与优先级链
+  不变（节点标题 → 类型+连线 → 类型默认 → null）。discover 顶部 docstring、
+  tools.py list_workflows 示例、README 示例与说明、测试中的类型默认断言
+  同步更新，用户自定义标题相关断言与 fixture 保持原样。版本仍为 0.3.0。
+
 ## 2026-10-02 version:0.2.0
 
 - pending: 新增图片签名 URL：GET /images/{prompt_id}/{index}[.ext]?e=&s= 端点

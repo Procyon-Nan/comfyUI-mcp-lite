@@ -87,7 +87,7 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
     async def list_workflows() -> dict[str, Any]:
         """List available workflows and the fields each accepts (prompts/numbers/images; empty categories omit keys). (中文：列出可用工作流，以及每个工作流能填什么（prompts/numbers/images，空类省略键）。)
 
-        Returns e.g. {"simple": {"prompts": {"78.text": {"label": "正面提示词"}}, ...}}. A null label means no semantic was inferred, but the address is still callable. Omitted fields keep the workflow's original value. (中文：返回形如上例；label 为 null 表示未识别出语义，地址仍可直接调用；不填的字段运行时用工作流原值。)
+        Returns e.g. {"simple": {"prompts": {"78.text": {"label": "Positive prompt (中文：正面提示词)"}}, ...}}. A null label means no semantic was inferred, but the address is still callable. Omitted fields keep the workflow's original value. (中文：返回形如上例；label 为 null 表示未识别出语义，地址仍可直接调用；不填的字段运行时用工作流原值。)
         """
         paths = await client.list_workflow_paths()
         result: dict[str, Any] = {}
