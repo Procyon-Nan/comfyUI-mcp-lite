@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-04 version:0.3.0
+
+- pending: 移除 v0.2 引入的图片签名 URL 功能（ChatLuna 客户端已自行
+  转存图片并以 text 形式给出链接，urls 字段无人使用，且随签名 TTL
+  1 小时过期）：删除 GET /images/{prompt_id}/{index} 端点与 signing.py，
+  run_workflow / get_image 完成态文本 JSON 不再附带 urls 字段
+  （status / prompt_id / images 保留，内联 base64 图块不变）；移除配置项
+  PUBLIC_BASE_URL 与 IMAGE_URL_TTL_SECONDS 及其校验；build_app 回退为
+  Bearer 鉴权中间件直接包住 /mcp 应用（不再需要 Starlette 顶层路由，
+  pyproject 相应去掉显式 starlette 依赖，由 mcp SDK 传递提供）；移除
+  相关测试（/images 端点规格 8 条、PUBLIC_BASE_URL 配置校验、urls 断言）。
+  版本 0.2.0 → 0.3.0。
+
 ## 2026-10-02 version:0.2.0
 
 - pending: 新增图片签名 URL：GET /images/{prompt_id}/{index}[.ext]?e=&s= 端点
