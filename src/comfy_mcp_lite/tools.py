@@ -13,10 +13,11 @@ import base64
 import json
 import mimetypes
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ImageContent, TextContent
+from pydantic import Field
 
 from .comfy import (
     ComfyClient,
@@ -84,10 +85,9 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
 
     @mcp.tool()
     async def list_workflows() -> dict[str, Any]:
-        """列出可用工作流，以及每个工作流能填什么（prompts/numbers/images，空类省略键）。
+        """List available workflows and the fields each accepts (prompts/numbers/images; empty categories omit keys). (中文：列出可用工作流，以及每个工作流能填什么（prompts/numbers/images，空类省略键）。)
 
-        返回形如 {"simple": {"prompts": {"78.text": {"label": "正面提示词"}}, ...}}；
-        label 为 null 表示未识别出语义，地址仍可直接调用。不填的字段运行时用工作流原值。
+        Returns e.g. {"simple": {"prompts": {"78.text": {"label": "正面提示词"}}, ...}}. A null label means no semantic was inferred, but the address is still callable. Omitted fields keep the workflow's original value. (中文：返回形如上例；label 为 null 表示未识别出语义，地址仍可直接调用；不填的字段运行时用工作流原值。)
         """
         paths = await client.list_workflow_paths()
         result: dict[str, Any] = {}
@@ -104,19 +104,17 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
 
     @mcp.tool()
     async def run_workflow(
-        workflow: str,
-        prompts: dict[str, str] | None = None,
-        numbers: dict[str, int | float] | None = None,
-        images: dict[str, str] | None = None,
-        timeout_seconds: float = 60.0,
+        workflow: Annotated[str, Field(description='Name of the workflow to run (see list_workflows). (中文：要运行的工作流名称，见 list_workflows。)')],
+        prompts: Annotated[dict[str, str] | None, Field(description='Text prompts; keys are field addresses from list_workflows (e.g. "78.text"). (中文：文本提示词，键为 list_workflows 报出的字段地址。)')] = None,
+        numbers: Annotated[dict[str, int | float] | None, Field(description='Numeric fields such as width/height; keys are field addresses (e.g. "80.width"). (中文：数值字段如宽高，键为字段地址。)')] = None,
+        images: Annotated[dict[str, str] | None, Field(description='Reference images; keys are field addresses (e.g. "5.image"), values are a data URL or an http(s) URL. (中文：参考图，键为字段地址，值为 data URL 或 http(s) URL。)')] = None,
+        timeout_seconds: Annotated[float, Field(description='Max seconds to wait for completion; default 60. (中文：等待完成的最大秒数，默认 60。)')] = 60.0,
     ) -> list[TextContent | ImageContent]:
-        """按名字跑一个已有工作流并等待出图；成功时图片直接内联返回。
+        """Run a named workflow and wait for the output images; on success the images are inlined. (中文：按名称运行工作流并等待出图；成功时图片直接内联返回。)
 
-        prompts/numbers/images 的键用 list_workflows 报出的地址（如 "78.text"、
-        "80.width"、"5.image"）。images 的值仅支持两种：内联 data URL（
-        data:image/png;base64,...）或 http(s) URL（服务器代下载后自动上传）。
-        不填的字段保持工作流原值。等待超过 timeout_seconds 时返回
-        {"status":"timeout","prompt_id":...}（不含图），之后可用 get_image 补取。
+        prompts/numbers/images keys are the addresses reported by list_workflows (e.g. "78.text", "80.width", "5.image"). images values accept only an inline data URL (data:image/png;base64,...) or an http(s) URL (the server fetches and uploads it). Omitted fields keep the workflow's original value. (中文：prompts/numbers/images 的键用 list_workflows 报出的地址（如 "78.text"、"80.width"、"5.image"）。images 的值仅支持内联 data URL（data:image/png;base64,...）或 http(s) URL（服务器代下载后自动上传）。不填的字段保持工作流原值。)
+
+        If waiting exceeds timeout_seconds, returns {"status":"timeout","prompt_id":...} without images; fetch later with get_image. (中文：等待超过 timeout_seconds 时返回不含图的该 JSON，之后可用 get_image 补取。)
         """
         if timeout_seconds <= 0:
             raise ComfyError("timeout_seconds 必须为正数")
@@ -177,11 +175,13 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
         ]
 
     @mcp.tool()
-    async def get_image(prompt_id: str, index: int = 0) -> list[TextContent | ImageContent]:
-        """按任务 ID 立即取图，绝不等待。
+    async def get_image(
+        prompt_id: Annotated[str, Field(description='Task ID returned by run_workflow. (中文：run_workflow 返回的任务 ID。)')],
+        index: Annotated[int, Field(description='Which image to return, 0-based; out of range returns all. (中文：返回第几张图，从 0 起；越界返回全部。)')] = 0,
+    ) -> list[TextContent | ImageContent]:
+        """Fetch images for a task ID immediately; never waits. (中文：按任务 ID 立即取图，绝不等待。)
 
-        已完成返回 {"status":"completed"} 并内联附上图片；仍在执行返回
-        {"status":"running"}；index 选第几张（从 0 起），越界则返回全部。
+        Returns {"status":"completed"} with inlined images if finished, or {"status":"running"} if still executing. index picks the n-th image (0-based); out of range returns all. (中文：已完成返回该 JSON 并内联附图；仍在执行返回 running；index 选第几张（从 0 起），越界返回全部。)
         """
         entry = await client.get_history_entry(prompt_id)
         if entry is None:

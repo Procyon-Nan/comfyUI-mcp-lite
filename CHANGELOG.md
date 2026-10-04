@@ -13,6 +13,14 @@
   相关测试（/images 端点规格 8 条、PUBLIC_BASE_URL 配置校验、urls 断言）。
   版本 0.2.0 → 0.3.0。
 
+- pending: 三个 MCP 工具（list_workflows / run_workflow / get_image）的
+  工具描述与参数描述统一改为「简明英文 + 中文直译注释」形式：英文在前，
+  中文紧随并以 (中文：……) 包裹，工具描述按段组织；run_workflow 与
+  get_image 的每个参数改用 typing.Annotated[<type>,
+  Field(description=...)] 声明，schema 中每个参数均携带 description
+  （参数名、类型与默认值保持不变，未设置中文 title）。仅改描述文案，
+  功能行为与测试断言均不变。
+
 ## 2026-10-02 version:0.2.0
 
 - pending: 新增图片签名 URL：GET /images/{prompt_id}/{index}[.ext]?e=&s= 端点
