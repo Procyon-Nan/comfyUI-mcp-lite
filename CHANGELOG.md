@@ -54,7 +54,7 @@
   /兜底/双空报错/缓存命中 5），共 55 项。README 取图说明同步。版本仍为
   0.3.0。
 
-- pending: 纠正上一版把中文内嵌进对外描述串的做法：MCP 对外描述一律
+- c567ba7: 纠正上一版把中文内嵌进对外描述串的做法：MCP 对外描述一律
   纯英文（工具 docstring、参数 Field description、类型默认 label 常量、
   list_workflows 示例、README 示例），原中文含义改为源码内紧邻的 #
   注释；5 个类型默认 label 常量同步纯英文，discover 顶部 docstring 与
