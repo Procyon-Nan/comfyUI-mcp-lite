@@ -5,6 +5,11 @@
 一致），未知地址与跨类地址都报错并回列可填字段，绝不静默忽略。
 
 图片以 MCP ImageContent（base64 字节）内联返回。
+
+取图双源（规格 §6.2）：WS 优先、磁盘兜底。SaveImageWebsocket 类
+输出节点不落盘，成品 PNG 只经 WS 帧推给本服务，取到后另存进程内
+缓存（image_cache）供 get_image 补取；WS 没拿到时回退原磁盘路
+（history outputs → /view）。
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ from .comfy import (
 from .config import Config
 from .converter import Converter
 from .discover import discover_fields
+from .image_cache import ImageCache
 from .images import resolve_image_source
 from .progress import wait_for_completion
 
@@ -82,6 +88,7 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
     """
     converter = Converter(client)
     client_id = uuid.uuid4().hex  # WS 订阅与任务提交共用的身份
+    ws_cache = ImageCache()  # WS 成品图的进程内缓存（get_image 补取用）
 
     @mcp.tool()
     async def list_workflows() -> dict[str, Any]:
@@ -147,10 +154,10 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
             prompt[node_id]["inputs"][field] = value
 
         prompt_id = await client.queue_prompt(prompt, client_id)
-        status = await wait_for_completion(
+        completion = await wait_for_completion(
             client, prompt_id, client_id, config.comfyui_url, timeout_seconds
         )
-        if status == "timeout":
+        if completion.status == "timeout":
             return [
                 _text(
                     {
@@ -161,6 +168,20 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
                 )
             ]
 
+        # 双源取图（WS 优先）：SaveImageWebsocket 的成品 PNG 只在 WS 帧里，
+        # 每帧一张、按捕获顺序；取到即入内存缓存供 get_image 补取
+        if completion.ws_images:
+            ws_cache.store(prompt_id, completion.ws_images)
+            blocks = [
+                _image_content(data, f"ws_{i}.png")
+                for i, data in enumerate(completion.ws_images)
+            ]
+            return [
+                _text(_completed_payload(prompt_id, len(blocks))),
+                *blocks,
+            ]
+
+        # 磁盘兜底：history outputs → /view（SaveImage 类节点产物）
         entry = await client.get_history_entry(prompt_id)
         metas = history_output_images(entry or {})
         if not metas:
@@ -183,6 +204,20 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
 
         Returns {"status":"completed"} with inlined images if finished, or {"status":"running"} if still executing. index picks the n-th image (0-based); out of range returns all. (中文：已完成返回该 JSON 并内联附图；仍在执行返回 running；index 选第几张（从 0 起），越界返回全部。)
         """
+
+        # WS 出图的任务：命中内存缓存直接内联（磁盘上本就没有这些图；
+        # 进程重启后缓存消失，自然落回磁盘路）
+        cached = ws_cache.get(prompt_id)
+        if cached:
+            selected = cached if not 0 <= index < len(cached) else [cached[index]]
+            blocks = [
+                _image_content(data, f"ws_{i}.png")
+                for i, data in enumerate(selected)
+            ]
+            return [
+                _text(_completed_payload(prompt_id, len(blocks))),
+                *blocks,
+            ]
         entry = await client.get_history_entry(prompt_id)
         if entry is None:
             if await client.is_in_queue(prompt_id):

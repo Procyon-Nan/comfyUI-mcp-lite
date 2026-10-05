@@ -29,6 +29,31 @@
   tools.py list_workflows 示例、README 示例与说明、测试中的类型默认断言
   同步更新，用户自定义标题相关断言与 fixture 保持原样。版本仍为 0.3.0。
 
+- pending: 新增双源取图（WS 优先、磁盘兜底），支持输出节点为
+  SaveImageWebsocket（custom_nodes/websocket_image_save.py，不落盘、
+  成品 PNG 经进度 hook 推给 WS）的工作流：progress.py 的 WS 监听不再
+  丢弃二进制帧，按 ComfyUI 协议解析（帧 = >I event_type + 数据，
+  PREVIEW_IMAGE(1)/UNENCODED_PREVIEW_IMAGE(2) 的数据 = >I image_type +
+  图片字节），只收集 image_type=2 且带 PNG 魔数的成品帧（上限 16 帧 /
+  单帧 32MB，超限按长度剪枝丢弃），websockets max_size 由 16MB 放宽到
+  32MB+8 以容纳完整 PNG；wait_for_completion 返回值由状态字符串改为
+  Completion(status, ws_images)，且成功收尾时对 WS 监听做最长 0.5 秒的
+  宽限排水（轮询抢先判定终态时成品帧可能仍在接收队列，等监听收到终态
+  JSON 事件自然退出可确保帧收全）。tools.py 的 run_workflow 改为 WS 帧
+  优先出图（每帧一张、按捕获顺序，并写入内存缓存），WS 无图回退原
+  history/SaveImage 磁盘路径，两路皆空才报「任务已完成但未产出图片」，
+  完成态文本 JSON 结构不变（仍为 status/prompt_id/images）。新增
+  image_cache.py：prompt_id → PNG 字节列表的进程内 LRU 缓存（上限
+  32 条 / 256MB），get_image 命中即直接内联返回（index 语义与磁盘路
+  一致），未命中回退磁盘；缓存属进程内存，服务重启即失效（已知可接受
+  权衡，磁盘路不受影响）。tests/fake_comfy.py 增加可选 /ws（构造传
+  ws=True：auto 任务等 WS 客户端接入时完成，按真实时序推成品帧 →
+  落 history → 发终态事件；ws_images/diskless 两个开关模拟成品帧推送与
+  不落盘），make_png 用于生成可区分的贴图。新增测试 17 项（帧解析 3、
+  收集器 3、wait_for_completion 集成 1、ImageCache 5、服务级双源优先级
+  /兜底/双空报错/缓存命中 5），共 55 项。README 取图说明同步。版本仍为
+  0.3.0。
+
 ## 2026-10-02 version:0.2.0
 
 - pending: 新增图片签名 URL：GET /images/{prompt_id}/{index}[.ext]?e=&s= 端点

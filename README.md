@@ -61,6 +61,9 @@ export MCP_AUTH_TOKEN=<长随机串>
 - 地址必须是该工作流真实存在的 `node_id.field`（即 `list_workflows` 报出的），否则报错
 - `images` 的值仅两种：内联 `data:image/png;base64,...` 或 http(s) URL（服务器代下载后上传）
 - 默认等到结果：成功内联返回图片；超时返回 `{"status":"timeout","prompt_id":...}`（不含图），稍后用 `get_image` 补取
+- 取图双源：**WS 优先、磁盘兜底**——成品 PNG 优先从 WebSocket 帧抓取
+  （因此支持 `SaveImageWebsocket` 这类不落盘的输出节点），WS 没拿到时
+  回退磁盘产物（`/history` 的 SaveImage 输出）；两路皆空才报「未产出图片」
 
 ### get_image
 
@@ -69,7 +72,9 @@ export MCP_AUTH_TOKEN=<长随机串>
 ```
 
 立即返回、绝不等待：已完成回图（`index` 越界返回全部）；未完成返回 `{"status":"running"}`；
-无任务/无图给出明确错误。
+无任务/无图给出明确错误。WS 出图的任务先查进程内缓存（上限 32 条 / 256MB，
+LRU）命中即内联返回；缓存属进程内存，服务重启即失效，此时回退磁盘路
+（`SaveImage` 类工作流不受影响）。
 
 ## 返回格式说明
 
@@ -114,7 +119,8 @@ sudo systemctl enable --now comfy-mcp-lite
 ```bash
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest            # 离线测试：转换冒烟、字段发现、鉴权、配置、
-                            # 服务级端到端（假 ComfyUI，走轮询兜底路径）
+                            # 服务级端到端（假 ComfyUI：默认无 /ws 走轮询
+                            # 兜底，带 /ws 时走 WS 成品帧取图路径）
 ```
 
 `tests/fixtures/` 存放从 .98 导出的 `simple.ui.json` 与 `object_info.json`，

@@ -23,7 +23,7 @@ from comfy_mcp_lite.comfy import ComfyClient
 from comfy_mcp_lite.config import Config
 from comfy_mcp_lite.images import resolve_image_source
 from comfy_mcp_lite.server import build_app
-from fake_comfy import FakeComfy
+from fake_comfy import FakeComfy, make_png
 
 _TINY_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
@@ -48,9 +48,9 @@ async def _start_server(app: Any, port: int = 0) -> tuple[uvicorn.Server, asynci
 
 
 @contextlib.asynccontextmanager
-async def _env(simple_ui: dict, object_info: dict):
-    """起假 ComfyUI + 真服务。"""
-    fake = FakeComfy({"simple.json": simple_ui}, object_info)
+async def _env(simple_ui: dict, object_info: dict, ws: bool = False):
+    """起假 ComfyUI + 真服务；ws=True 时假 ComfyUI 挂上 /ws。"""
+    fake = FakeComfy({"simple.json": simple_ui}, object_info, ws=ws)
     fake_server, fake_task, fake_port = await _start_server(fake.build())
     config = Config(
         comfyui_url=f"http://127.0.0.1:{fake_port}",
@@ -75,6 +75,13 @@ async def _env(simple_ui: dict, object_info: dict):
 @pytest.fixture
 async def env(simple_ui: dict, object_info: dict):
     async with _env(simple_ui, object_info) as e:
+        yield e
+
+
+@pytest.fixture
+async def ws_env(simple_ui: dict, object_info: dict):
+    """假 ComfyUI 带 /ws（默认不推成品帧，走磁盘兜底）。"""
+    async with _env(simple_ui, object_info, ws=True) as e:
         yield e
 
 
@@ -349,3 +356,87 @@ async def test_image_source_rejects_garbage(env) -> None:
     with pytest.raises(ComfyError, match="不支持的参考图源"):
         await resolve_image_source(client, "/etc/passwd")
 
+
+
+# ---- WS 取图（SaveImageWebsocket 类工作流：成品 PNG 不落盘，只走 WS 帧）----
+
+_WS_RED = make_png(b"\xff\x00\x00")
+_WS_BLUE = make_png(b"\x00\x00\xff")
+
+
+def _inline_images(result: Any) -> list[bytes]:
+    return [base64.b64decode(b.data) for b in result.content if b.type == "image"]
+
+
+async def test_run_workflow_prefers_ws_over_disk(ws_env) -> None:
+    """磁盘与 WS 都有图时结果取 WS 帧（红色贴图 ≠ 磁盘贴图）。"""
+    ws_env.fake.ws_images = [_WS_RED]
+    async with mcp_session(ws_env) as session:
+        result = await session.call_tool(
+            "run_workflow", {"workflow": "simple", "prompts": {"78.text": "a cat"}}
+        )
+        assert not result.is_error
+        payload = _text_payload(result)
+        assert payload["status"] == "completed"
+        assert payload["images"] == 1
+        assert _WS_RED != _TINY_PNG  # 两种贴图可区分，证明来源确是 WS
+        assert _inline_images(result) == [_WS_RED]
+
+
+async def test_run_workflow_ws_only_multi_images_in_order(ws_env) -> None:
+    """SaveImageWebsocket 场景：不落盘（history outputs 空），多张按帧序。"""
+    ws_env.fake.ws_images = [_WS_RED, _WS_BLUE]
+    ws_env.fake.diskless = True
+    async with mcp_session(ws_env) as session:
+        result = await session.call_tool(
+            "run_workflow", {"workflow": "simple", "prompts": {"78.text": "two cats"}}
+        )
+        assert not result.is_error
+        assert _text_payload(result)["images"] == 2
+        assert _inline_images(result) == [_WS_RED, _WS_BLUE]
+
+
+async def test_run_workflow_falls_back_to_disk_without_ws_frames(ws_env) -> None:
+    """WS 连上了但没有成品帧（未设 ws_images）→ 回退磁盘取图。"""
+    async with mcp_session(ws_env) as session:
+        result = await session.call_tool(
+            "run_workflow", {"workflow": "simple", "prompts": {"78.text": "disk"}}
+        )
+        assert not result.is_error
+        images = _inline_images(result)
+        assert images and images[0] == _TINY_PNG
+
+
+async def test_run_workflow_no_images_anywhere_errors(ws_env) -> None:
+    """WS 无帧 + 磁盘无产物 → 「任务已完成但未产出图片」。"""
+    ws_env.fake.diskless = True
+    async with mcp_session(ws_env) as session:
+        result = await session.call_tool(
+            "run_workflow", {"workflow": "simple", "prompts": {"78.text": "void"}}
+        )
+        assert result.is_error
+        assert "未产出图片" in _error_text(result)
+
+
+async def test_get_image_hits_ws_cache(ws_env) -> None:
+    """run_workflow 用 WS 出图后，get_image 命中内存缓存直接回图。"""
+    ws_env.fake.ws_images = [_WS_RED, _WS_BLUE]
+    ws_env.fake.diskless = True  # 磁盘路必空：命中缓存是唯一出图途径
+    async with mcp_session(ws_env) as session:
+        result = await session.call_tool(
+            "run_workflow", {"workflow": "simple", "prompts": {"78.text": "cache me"}}
+        )
+        assert not result.is_error
+        prompt_id = _text_payload(result)["prompt_id"]
+
+        result = await session.call_tool("get_image", {"prompt_id": prompt_id})
+        assert not result.is_error
+        payload = _text_payload(result)
+        assert payload["status"] == "completed"
+        assert _inline_images(result) == [_WS_RED]  # 默认 index=0 → 第 1 张
+
+        # index 语义与磁盘路一致：选第 2 张 / 越界返回全部
+        result = await session.call_tool("get_image", {"prompt_id": prompt_id, "index": 1})
+        assert _inline_images(result) == [_WS_BLUE]
+        result = await session.call_tool("get_image", {"prompt_id": prompt_id, "index": 99})
+        assert _text_payload(result)["images"] == 2
