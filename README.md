@@ -39,13 +39,13 @@ export MCP_AUTH_TOKEN=<长随机串>
 列出可用工作流及每个工作流能填什么：
 
 ```json
-{"simple": {"prompts": {"78.text": {"label": "Positive prompt (中文：正面提示词)"}, "79.text": {"label": "Negative prompt (中文：负面提示词)"}},
-            "numbers": {"80.width": {"label": "Width (中文：宽度)"}, "80.height": {"label": "Height (中文：高度)"}}}}
+{"simple": {"prompts": {"78.text": {"label": "Positive prompt"}, "79.text": {"label": "Negative prompt"}},
+            "numbers": {"80.width": {"label": "Width"}, "80.height": {"label": "Height"}}}}
 ```
 
 - 空类省略键（无参考图入口的工作流不出现 `images`）
 - 含 LoadImage 的工作流报出 `images` 地址（如 `"5.image"`），label 默认
-  「Reference image (img2img base) (中文：参考图（图生图底图）)」，节点自定义标题优先
+  「Reference image (img2img base)」（参考图，图生图底图），节点自定义标题优先
 - `label` 为 null 表示未识别出语义，地址仍可直接调用（仅出现在 prompts）
 - 不填的字段运行时用工作流原值
 

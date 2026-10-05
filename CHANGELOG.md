@@ -54,6 +54,13 @@
   /兜底/双空报错/缓存命中 5），共 55 项。README 取图说明同步。版本仍为
   0.3.0。
 
+- pending: 纠正上一版把中文内嵌进对外描述串的做法：MCP 对外描述一律
+  纯英文（工具 docstring、参数 Field description、类型默认 label 常量、
+  list_workflows 示例、README 示例），原中文含义改为源码内紧邻的 #
+  注释；5 个类型默认 label 常量同步纯英文，discover 顶部 docstring 与
+  测试中的类型默认断言同步更新。仅描述文案与注释变动，参数名/类型/
+  默认值/行为/返回结构均不变，pytest 仍 55 passed。
+
 ## 2026-10-02 version:0.2.0
 
 - pending: 新增图片签名 URL：GET /images/{prompt_id}/{index}[.ext]?e=&s= 端点
