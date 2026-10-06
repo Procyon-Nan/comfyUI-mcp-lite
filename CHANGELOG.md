@@ -61,7 +61,7 @@
   测试中的类型默认断言同步更新。仅描述文案与注释变动，参数名/类型/
   默认值/行为/返回结构均不变，pytest 仍 55 passed。
 
-- pending: 新增按请求头 X-Comfy-Workflows 的 per-client 工作流作用域：
+- 22c9efe: 新增按请求头 X-Comfy-Workflows 的 per-client 工作流作用域：
   list_workflows 读取当前 HTTP 请求的该头（逗号分隔、逐项 URL 编码，纯
   ASCII），解码后与服务端工作流真名精确匹配，只返回命中项；头缺失/为空/
   纯空白则不过滤返回全部（完全向后兼容），头里点名不存在的工作流静默
