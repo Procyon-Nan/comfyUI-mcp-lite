@@ -21,6 +21,7 @@ import uuid
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.context import Context
 from mcp.types import ImageContent, TextContent
 from pydantic import Field
 
@@ -32,7 +33,7 @@ from .comfy import (
 )
 from .config import Config
 from .converter import Converter
-from .discover import discover_fields
+from .discover import discover_fields, select_workflow_names
 from .image_cache import ImageCache
 from .images import resolve_image_source
 from .progress import wait_for_completion
@@ -81,6 +82,19 @@ def _completed_payload(prompt_id: str, image_count: int) -> dict[str, Any]:
     """完成态结果 JSON：状态 + prompt_id + 图片数。"""
     return {"status": "completed", "prompt_id": prompt_id, "images": image_count}
 
+
+def _request_header(ctx: Context, name: str) -> str | None:
+    """取当前工具调用所属 HTTP 请求的头（小写名，Starlette Headers 大小写不敏感）。"""
+    # 非 HTTP 传输（stdio 等）没有 request / headers，无请求上下文时
+    # ctx.request_context 会抛 ValueError —— 一律视为头不存在（调用方不过滤）
+    try:
+        request = ctx.request_context.request
+    except ValueError:
+        return None
+    headers = getattr(request, "headers", None)
+    return headers.get(name) if headers is not None else None
+
+
 def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
     """在 MCPServer 实例上注册三个工具。
 
@@ -91,15 +105,27 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
     ws_cache = ImageCache()  # WS 成品图的进程内缓存（get_image 补取用）
 
     @mcp.tool()
-    async def list_workflows() -> dict[str, Any]:
+    async def list_workflows(ctx: Context) -> dict[str, Any]:
         """List available workflows and the fields each accepts (prompts/numbers/images; empty categories omit keys).
 
         Returns e.g. {"simple": {"prompts": {"78.text": {"label": "Positive prompt"}}, ...}}. A null label means no semantic was inferred, but the address is still callable. Omitted fields keep the workflow's original value.
+
+        Per-client scoping: a client may send an X-Comfy-Workflows header (comma-separated, URL-encoded workflow names) to list only those workflows; a missing or empty header lists everything.
         """
         # 列出可用工作流，以及每个工作流能填什么（prompts/numbers/images，空类省略键）。
         # 返回形如上例；label 为 null 表示未识别出语义，地址仍可直接调用；
         # 不填的字段运行时用工作流原值。
         paths = await client.list_workflow_paths()
+        # per-client 工作流作用域：X-Comfy-Workflows 头点名本客户端可见的
+        # 工作流（逐项 unquote 解码后与服务端真名精确匹配，不存在的名字
+        # 静默忽略）。头缺失/为空 → 不过滤，返回全部（完全向后兼容）。
+        # 过滤放在转换与字段发现之前：被收窄的工作流不做转换，省算力。
+        header_value = _request_header(ctx, "x-comfy-workflows")
+        if header_value is not None:
+            selected = set(
+                select_workflow_names([p[: -len(".json")] for p in paths], header_value)
+            )
+            paths = [p for p in paths if p[: -len(".json")] in selected]
         result: dict[str, Any] = {}
         for rel_path in paths:
             name = rel_path[: -len(".json")]

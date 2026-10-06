@@ -15,11 +15,17 @@ label 优先级（规格 §4.1）：
 3. 类型默认：白名单尺寸节点的 width/height →
    「Width」/「Height」、LoadImage.image → 「Reference image (img2img base)」
 4. 都不行 → label: null（地址仍可调用）
+
+按客户端过滤（规格 omp-spec-header-filter）：X-Comfy-Workflows 请求头
+点名该客户端可见的工作流（逗号分隔、逐项 URL 编码），select_workflow_names
+据此收窄 list_workflows 的展示范围；头缺失/为空则不过滤（完全向后兼容）。
 """
 
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import unquote
+
 
 _PROMPT_NODE = "CLIPTextEncode"
 # latent 尺寸节点白名单：这些节点的 width/height 输入按 numbers 类收
@@ -130,3 +136,29 @@ def discover_fields(
                 _add(result, "images", node_id, "image", title or _LABEL_REFERENCE)
 
     return result
+
+
+def select_workflow_names(names: list[str], header_value: str | None) -> list[str]:
+    """按 X-Comfy-Workflows 头值筛选要展示的工作流名（纯函数）。
+
+    - 头缺失 / 空 / 纯空白 → 原样返回全部（向后兼容）；
+    - 头存在 → 逐项匹配：先 unquote(item) 解码后与服务端真名精确匹配，
+      不中再把 item 原样精确匹配（容忍已编码/未编码两种写法），仍不中
+      即忽略（服务端不存在的工作流静默跳过，改名/删除不报错）；
+    - 忽略空项（连续逗号、首尾逗号、纯空白项），重复项去重；
+    - 输出保持 names 的原顺序。
+    """
+    if header_value is None or not header_value.strip():
+        return list(names)
+    known = frozenset(names)
+    selected: set[str] = set()
+    for item in header_value.split(","):
+        item = item.strip()
+        if not item:
+            continue  # 空项：连续逗号 / 首尾逗号 / 纯空白
+        decoded = unquote(item)
+        if decoded in known:
+            selected.add(decoded)
+        elif item in known:
+            selected.add(item)
+    return [name for name in names if name in selected]

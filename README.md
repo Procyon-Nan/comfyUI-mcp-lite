@@ -95,6 +95,26 @@ hermes mcp add comfy --url http://<B 地址>:9101/mcp --auth header
 
 请求头 `{"Authorization": "Bearer <MCP_AUTH_TOKEN>"}`，工具调用超时建议 120 秒。
 
+## 按客户端过滤工作流
+
+不同客户端可在请求头里声明"只暴露哪些工作流"，服务端据此收窄
+`list_workflows` 的输出（`run_workflow` / `get_image` 不受限）：
+
+- 头名：`X-Comfy-Workflows`
+- 值：逗号分隔的工作流名，**每项做 URL 编码**（纯 ASCII，避免非 ASCII
+  头值被客户端直接拒发）
+- 头缺失 / 为空 → 不过滤，返回全部（默认行为，向后兼容）
+- 头里点名了服务端不存在的工作流（已改名 / 删除）→ 静默忽略
+- 重复项去重，空项跳过
+
+例：只暴露「文生图」与「文生图 (Copy)」：
+
+```
+X-Comfy-Workflows: %E6%96%87%E7%94%9F%E5%9B%BE,%E6%96%87%E7%94%9F%E5%9B%BE%20%28Copy%29
+```
+
+每项就是把工作流名做一次 URL 编码（ASCII 名如 `simple`，编码后仍是 `simple`）。
+
 ## 工作流格式说明
 
 ComfyUI `userdata/workflows/` 里的文件是 **UI 格式**，`POST /prompt` 只吃

@@ -61,6 +61,18 @@
   测试中的类型默认断言同步更新。仅描述文案与注释变动，参数名/类型/
   默认值/行为/返回结构均不变，pytest 仍 55 passed。
 
+- pending: 新增按请求头 X-Comfy-Workflows 的 per-client 工作流作用域：
+  list_workflows 读取当前 HTTP 请求的该头（逗号分隔、逐项 URL 编码，纯
+  ASCII），解码后与服务端工作流真名精确匹配，只返回命中项；头缺失/为空/
+  纯空白则不过滤返回全部（完全向后兼容），头里点名不存在的工作流静默
+  忽略（改名/删除不报错），重复项去重、空项跳过、输出保持服务端原顺序。
+  过滤在转换与字段发现之前执行（被收窄的工作流不做转换，省算力）。
+  select_workflow_names 纯函数落在 discover.py；tools.py 的 list_workflows
+  增加 Context 参数（SDK 自动注入、不作为工具入参暴露）并经 _request_header
+  取头（非 HTTP 传输或取不到头时视为不过滤）。工具对外描述保持纯英文。
+  新增 tests/test_headers_filter.py（纯函数 9 项 + HTTP 端到端 9 项），
+  共 73 项全绿。版本仍为 0.3.0。
+
 ## 2026-10-02 version:0.2.0
 
 - pending: 新增图片签名 URL：GET /images/{prompt_id}/{index}[.ext]?e=&s= 端点
