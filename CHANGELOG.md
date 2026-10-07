@@ -2,6 +2,23 @@
 
 ## 2026-10-04 version:0.3.0
 
+- pending: 修复并发/跨会话串图：client_id 原在 register() 里生成一次、
+  全进程复用，而 ComfyUI 的 WS 注册表按 clientId 单槽位（同 id 再连
+  顶替旧连接，server.py:276-284），并发或先后两次 run_workflow 共用
+  同一 id 时，后建立的监听顶掉先建的，先发起一方的成品 PNG 帧被投给
+  对方的连接（串图），自身收不到帧只能落磁盘兜底，而 SaveImageWebsocket
+  不落盘 → 误报「任务已完成但未产出图片」。改为每次 run_workflow 调用
+  内生成调用级 call_client_id（queue_prompt 与 WS 监听共用），register()
+  不再持有进程级 id；WS 优先/磁盘兜底双源、ws_cache、converter 等行为
+  不变。tests/fake_comfy.py 复刻真实服务端语义：/ws 注册表按 clientId
+  单槽位（同 id 顶替）、成品帧与终态事件按任务记录的 client_id 定向
+  投递（该 id 无在线连接时帧丢弃），ws_images 支持 callable(job) 按
+  任务定制帧，新增 complete_over_ws 测试驱动与接入顺序记录
+  ws_client_ids。新增 tests/test_client_id_isolation.py 回归 2 项
+  （两次调用 client_id 互不相同的直接断言 + 两路并发 diskless 各取
+  各图的行为回归，共用 id 的旧实现上均失败），共 75 项全绿。版本仍为
+  0.3.0。
+
 - pending: 移除 v0.2 引入的图片签名 URL 功能（ChatLuna 客户端已自行
   转存图片并以 text 形式给出链接，urls 字段无人使用，且随签名 TTL
   1 小时过期）：删除 GET /images/{prompt_id}/{index} 端点与 signing.py，

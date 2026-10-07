@@ -98,10 +98,10 @@ def _request_header(ctx: Context, name: str) -> str | None:
 def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
     """在 MCPServer 实例上注册三个工具。
 
-    client 由 build_app 创建并传入（闭包持转换器与 client_id）。
+    client 由 build_app 创建并传入（闭包持转换器与 WS 成品图缓存；
+    client_id 不再进程级持有，由 run_workflow 每次调用生成）。
     """
     converter = Converter(client)
-    client_id = uuid.uuid4().hex  # WS 订阅与任务提交共用的身份
     ws_cache = ImageCache()  # WS 成品图的进程内缓存（get_image 补取用）
 
     @mcp.tool()
@@ -191,9 +191,14 @@ def register(mcp: MCPServer, config: Config, client: ComfyClient) -> None:
                 value = int(value)
             prompt[node_id]["inputs"][field] = value
 
-        prompt_id = await client.queue_prompt(prompt, client_id)
+        # 每次调用独立的 client_id：ComfyUI 的 WS 注册表按 clientId 单槽
+        # 位（同 id 再连会顶替旧连接），全进程共用一个 id 时，并发或先后
+        # 两次调用的监听会互相顶掉，先发起一方的成品帧被投给后者的连接
+        # （串图）。调用级 id 让每次调用独占槽位；提交与 WS 监听同 id。
+        call_client_id = uuid.uuid4().hex
+        prompt_id = await client.queue_prompt(prompt, call_client_id)
         completion = await wait_for_completion(
-            client, prompt_id, client_id, config.comfyui_url, timeout_seconds
+            client, prompt_id, call_client_id, config.comfyui_url, timeout_seconds
         )
         if completion.status == "timeout":
             return [
