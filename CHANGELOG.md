@@ -2,7 +2,7 @@
 
 ## 2026-10-04 version:0.3.0
 
-- pending: 修复并发/跨会话串图：client_id 原在 register() 里生成一次、
+- 5e85e93: 修复并发/跨会话串图：client_id 原在 register() 里生成一次、
   全进程复用，而 ComfyUI 的 WS 注册表按 clientId 单槽位（同 id 再连
   顶替旧连接，server.py:276-284），并发或先后两次 run_workflow 共用
   同一 id 时，后建立的监听顶掉先建的，先发起一方的成品 PNG 帧被投给
