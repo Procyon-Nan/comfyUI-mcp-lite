@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfy-mcp-lite"
-version = "0.3.0"
+version = "0.3.1"
 description = "轻量 ComfyUI MCP 服务器：用已有工作流生图（HTTP /mcp + Bearer 鉴权）"
 readme = "README.md"
 license = { text = "MIT" }
