@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-30 version:0.3.0
+
+- pending: 将 EmptyFlux2LatentImage 加入尺寸节点白名单，使 MOSS-Image 工作流的 width、height 字段可通过 list_workflows 发现并通过 run_workflow 修改；复用现有字段校验及标签逻辑。
+
 ## 2026-10-04 version:0.3.0
 
 - 5e85e93: 修复并发/跨会话串图：client_id 原在 register() 里生成一次、

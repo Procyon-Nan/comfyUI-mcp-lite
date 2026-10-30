@@ -5,7 +5,7 @@
 
 三类来源（规格固定）：
 - prompts ← CLIPTextEncode.text
-- numbers ← 尺寸节点白名单（EmptyLatentImage、LatentUpscale）的 .width / .height
+- numbers ← 尺寸节点白名单（EmptyLatentImage、EmptyFlux2LatentImage、LatentUpscale）的 .width / .height
 - images  ← LoadImage.image
 
 label 优先级（规格 §4.1）：
@@ -29,10 +29,11 @@ from urllib.parse import unquote
 
 _PROMPT_NODE = "CLIPTextEncode"
 # latent 尺寸节点白名单：这些节点的 width/height 输入按 numbers 类收
-# （EmptyLatentImage 定初始尺寸，LatentUpscale 重设尺寸，如图生图.json #96）。
+# （EmptyLatentImage / EmptyFlux2LatentImage 定初始尺寸，LatentUpscale 重设尺寸）。
 # 以后新增别的架构节点（能控制潜空间尺寸的）往这里加即可。
 _LATENT_SIZE_NODES = frozenset({
     "EmptyLatentImage",
+    "EmptyFlux2LatentImage",
     "LatentUpscale",
 })
 _IMAGE_NODE = "LoadImage"
